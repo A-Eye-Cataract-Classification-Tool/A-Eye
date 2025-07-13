@@ -1,3 +1,12 @@
+"""
+====================================================================
+NOTE:
+This file is part of the initial A-Eye prototype. Implementations
+are subject to refinement and may be updated for optimization,
+modularity, or alignment with project objectives.
+====================================================================
+"""
+
 import torch
 import torch.nn as nn
 
