@@ -7,89 +7,64 @@ modularity, or alignment with project objectives.
 ====================================================================
 """
 
-import numpy as np
 import torch
-import matplotlib.pyplot as plt
+import torch.nn as nn
 
-# --- Sinusoidal encoding for a single normalized radius ---
-def get_sinusoidal_encoding(radius: float, dim: int = 192) -> np.ndarray:
+class RadialPositionEmbedding(nn.Module):
     """
-    Computes sinusoidal positional encoding for a single radius value.
-
-    Args:
-        radius (float): Normalized radial position in range [0, 1].
-        dim (int): Dimensionality of the encoding vector (must be even).
-
-    Returns:
-        np.ndarray: A 1D array of shape [dim] containing the positional encoding.
+    Applies learnable positional embeddings to radial tokens.
+    Each concentric ring receives a distinct embedding vector.
     """
-    pe = np.zeros(dim)
-    for i in range(dim // 2):
-        angle = radius / (10000 ** (2 * i / dim))
-        pe[2 * i] = np.sin(angle)
-        pe[2 * i + 1] = np.cos(angle)
-    return pe
 
-# --- Generate encodings for all rings ---
-def get_radial_positional_encoding(num_rings: int = 4, dim: int = 192) -> np.ndarray:
-    """
-    Generates sinusoidal positional encodings for all radial rings.
+    def __init__(self, num_rings: int = 4, embed_dim: int = 192):
+        """
+        Args:
+            num_rings (int): Number of concentric radial rings.
+            embed_dim (int): Dimensionality of each token vector.
+        """
+        super().__init__()
+        self.num_rings = num_rings
+        self.embed_dim = embed_dim
+        self.embedding = nn.Embedding(num_embeddings=num_rings, embedding_dim=embed_dim)
 
-    This implementation assumes fixed normalized positions for a simplified
-    4-ring radial tokenization setup aligned with a pupil-based image.
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            x (Tensor): Radial tokens of shape (batch_size, num_rings, embed_dim)
 
-    Args:
-        num_rings (int): Number of concentric radial rings.
-        dim (int): Embedding dimension per ring.
+        Returns:
+            Tensor: Positionally encoded tokens of same shape.
+        """
+        batch_size, num_tokens, dim = x.shape
+        assert num_tokens == self.num_rings, f"Expected {self.num_rings} tokens, got {num_tokens}."
+        assert dim == self.embed_dim, f"Expected embed_dim {self.embed_dim}, got {dim}."
 
-    Returns:
-        np.ndarray: A tensor of shape [1, num_rings, dim]
-                    suitable for adding to radial token embeddings.
-    """
-    radii = np.linspace(0, 1, num=num_rings)                        # Normalized radial distances
-    encodings = [get_sinusoidal_encoding(r, dim) for r in radii]
-    return np.expand_dims(np.stack(encodings), axis=0)              # Shape: [1, num_rings, dim]
+        # Create [0, 1, 2, ..., num_rings - 1] and expand for batch
+        ring_indices = torch.arange(self.num_rings, device=x.device).unsqueeze(0)
+        ring_indices = ring_indices.expand(batch_size, -1)
 
-# --- Plot and save visualization of the encodings ---
-def plot_encodings(encodings: np.ndarray, output_path: str = "encoding_visual.png"):
-    """
-    Plots the positional encodings for visual inspection.
+        pos_embed = self.embedding(ring_indices)  # (batch_size, num_rings, embed_dim)
+        return x + pos_embed
 
-    Args:
-        encodings (np.ndarray): Tensor of shape [1, num_rings, dim]
-        output_path (str): Path to save the PNG visualization.
-    """
-    plt.figure(figsize=(10, 4))
-    for i in range(encodings.shape[1]):
-        plt.plot(encodings[0][i], label=f"Ring {i+1}")
-    plt.title("Radial Positional Encodings (Sinusoidal)")
-    plt.xlabel("Embedding Dimension")
-    plt.ylabel("Encoding Value")
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(output_path)
-    plt.close()
 
-# --- Main block: runs if script is executed directly ---
+# ========================== DEBUG / STANDALONE ==========================
 if __name__ == "__main__":
-    # Settings
-    num_rings = 4
-    dim = 192
+    print("Testing RadialPositionEmbedding module...\n")
 
-    # Generate the encoding tensor
-    enc = get_radial_positional_encoding(num_rings=num_rings, dim=dim)
-    print(f"Generated radial positional encoding with shape: {enc.shape}")
-    print(f"Normalized ring positions used: {np.linspace(0, 1, num=num_rings)}")
+# FOR DEBUGGING
+batch_size = 1              # Batch size for testing
+num_rings = 4               # Number of concentric rings
+embed_dim = 192             # Dimensionality of each token vector
 
-    # Save as .pt (PyTorch tensor)
-    torch_enc = torch.tensor(enc, dtype=torch.float32)
-    torch.save(torch_enc, "radial_pos_enc.pt")
-    print("Saved encoding tensor to: radial_pos_enc.pt")
+# Simulate dummy radial token embeddings (e.g., from tokenizer)
+dummy_input = torch.randn(batch_size, num_rings, embed_dim)
+print(f"Input shape: {dummy_input.shape}")
 
-    # Also save as .npy (NumPy format) for inspection
-    np.save("radial_pos_enc.npy", enc)
-    print("Saved encoding tensor to: radial_pos_enc.npy")
+# Initialize and apply radial position encoding
+pos_encoder = RadialPositionEmbedding(num_rings=num_rings, embed_dim=embed_dim)
+output = pos_encoder(dummy_input)
 
-    # Create and save a line plot
-    plot_encodings(enc)
-    print("Saved encoding plot to: encoding_visual.png")
+print(f"Output shape: {output.shape}")
+print("✓ Learnable positional encoding applied successfully.")
+print("\nPreview of encoded tensor (first sample):")
+print(output[0])  # Show one token batch output
