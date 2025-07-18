@@ -52,11 +52,11 @@ if __name__ == "__main__":
     print("Testing RadialPositionEmbedding module...\n")
 
 # FOR DEBUGGING
-batch_size = 1              # Batch size for testing
+batch_size = 5              # Batch size for testing
 num_rings = 4               # Number of concentric rings
 embed_dim = 192             # Dimensionality of each token vector
 
-# Simulate dummy radial token embeddings (e.g., from tokenizer)
+# Simulate dummy radial token embeddings
 dummy_input = torch.randn(batch_size, num_rings, embed_dim)
 print(f"Input shape: {dummy_input.shape}")
 
@@ -66,5 +66,15 @@ output = pos_encoder(dummy_input)
 
 print(f"Output shape: {output.shape}")
 print("✓ Learnable positional encoding applied successfully.")
-print("\nPreview of encoded tensor (first sample):")
-print(output[0])  # Show one token batch output
+print("\nPreview of encoded tensor:")
+
+
+# Shows the full content of the positional embedding tensor with shape (batch_size, num_rings, embed_dim)
+print(output)
+
+# Prints the shape of each ring embedding vector for every batch in the output tensor.
+for batch_idx in range(output.shape[0]):
+    print(f"\nBatch {batch_idx + 1}:")
+    for ring_idx in range(output.shape[1]):
+        vector = output[batch_idx, ring_idx]
+        print(f"  Ring {ring_idx + 1} vector shape: {vector.shape}")
