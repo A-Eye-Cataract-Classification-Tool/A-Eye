@@ -15,7 +15,7 @@ import torch
 import torch.nn as nn
 
 # transformer block (self-attention + feed-forward)
-from .transformer_block import TransformerBlock
+from transformer_block import TransformerBlock
 
 class ModifiedMobileViT(nn.Module):
     """
@@ -33,6 +33,7 @@ class ModifiedMobileViT(nn.Module):
         5. MLP classifier head with sigmoid activation
     """
 
+    # sets up the layers and parts of the model
     def __init__(self, in_dim=9, embed_dim=192, num_classes=1):
         super().__init__()
 
@@ -52,6 +53,7 @@ class ModifiedMobileViT(nn.Module):
         # Sigmoid activation to convert logits → probabilities (0 to 1)
         self.sigmoid = nn.Sigmoid()                         # separate for flexibility (e.g., during training)
 
+    # describes how input flows through the model
     def forward(self, tokens, pos_enc, return_logits=False):
         """
         Args:
