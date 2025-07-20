@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import torch  # Optional, only needed if saving as .pt
 
 # === Parameters ===
-IMAGE_PATH = 'C:/Users/caspe/Downloads/test/test_image4.jpg'  # Replace with actual image path
+IMAGE_PATH = "C:/Users/albon/Downloads/sample.jpg"  # Replace with actual image path
 CENTER = (64, 64)
 RINGS = [(0, 5), (5, 20), (20, 30), (30, 40)]  # Rings
 SAVE_PT = True  # Set False if you want .npy instead

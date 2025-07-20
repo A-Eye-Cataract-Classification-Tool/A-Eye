@@ -7,6 +7,8 @@ modularity, or alignment with project objectives.
 ====================================================================
 """
 
+import numpy as np
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 
@@ -51,30 +53,48 @@ class RadialPositionEmbedding(nn.Module):
 if __name__ == "__main__":
     print("Testing RadialPositionEmbedding module...\n")
 
-# FOR DEBUGGING
-batch_size = 5              # Batch size for testing
-num_rings = 4               # Number of concentric rings
-embed_dim = 192             # Dimensionality of each token vector
+    # FOR DEBUGGING
+    batch_size = 5              # Batch size for testing
+    num_rings = 4               # Number of concentric rings
+    embed_dim = 192             # Dimensionality of each token vector
 
-# Simulate dummy radial token embeddings
-dummy_input = torch.randn(batch_size, num_rings, embed_dim)
-print(f"Input shape: {dummy_input.shape}")
+    # Simulate dummy radial token embeddings
+    dummy_input = torch.randn(batch_size, num_rings, embed_dim)
+    print(f"Input shape: {dummy_input.shape}")
 
-# Initialize and apply radial position encoding
-pos_encoder = RadialPositionEmbedding(num_rings=num_rings, embed_dim=embed_dim)
-output = pos_encoder(dummy_input)
+    # Initialize and apply radial position encoding
+    pos_encoder = RadialPositionEmbedding(num_rings=num_rings, embed_dim=embed_dim)
+    output = pos_encoder(dummy_input)
 
-print(f"Output shape: {output.shape}")
-print("✓ Learnable positional encoding applied successfully.")
-print("\nPreview of encoded tensor:")
+    print(f"Output shape: {output.shape}")
+    print("✓ Learnable positional encoding applied successfully.")
+    print("\nPreview of encoded tensor:")
 
+    # Shows the full content of the positional embedding tensor
+    print(output)
 
-# Shows the full content of the positional embedding tensor with shape (batch_size, num_rings, embed_dim)
-print(output)
+    # Prints the shape of each ring embedding vector for every batch
+    for batch_idx in range(output.shape[0]):
+        print(f"\nBatch {batch_idx + 1}:")
+        for ring_idx in range(output.shape[1]):
+            vector = output[batch_idx, ring_idx]
+            print(f"  Ring {ring_idx + 1} vector shape: {vector.shape}")
 
-# Prints the shape of each ring embedding vector for every batch in the output tensor.
-for batch_idx in range(output.shape[0]):
-    print(f"\nBatch {batch_idx + 1}:")
-    for ring_idx in range(output.shape[1]):
-        vector = output[batch_idx, ring_idx]
-        print(f"  Ring {ring_idx + 1} vector shape: {vector.shape}")
+    # Save the output tensor as .pt and .npy
+    torch.save(output, "radial_pos_enc.pt")
+    np_output = output.detach().cpu().numpy()
+    np.save("radial_pos_enc.npy", np_output)
+    print("\nSaved: radial_pos_enc.pt and radial_pos_enc.npy")
+
+    # Visualize the embeddings as line plot
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(10, 4))
+    for ring in range(num_rings):
+        plt.plot(np_output[0, ring], label=f"Ring {ring + 1}")
+    plt.title("Learnable Positional Embeddings per Ring")
+    plt.xlabel("Embedding Dimension")
+    plt.ylabel("Value")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("encoding_visual.png")
+    print("Saved: encoding_visual.png")
