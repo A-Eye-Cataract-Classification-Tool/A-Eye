@@ -1,88 +1,87 @@
-"""
-====================================================================
-NOTE:
-This file is part of the initial A-Eye prototype. Implementations
-are subject to refinement and may be updated for optimization,
-modularity, or alignment with project objectives.
-
-NOTE: 
-MobileVit + Radial Tokenization block
-====================================================================
-"""
-
-# Torch = base library for building deep learning models
 import torch
 import torch.nn as nn
-
-# transformer block (self-attention + feed-forward)
 from transformer_block import TransformerBlock
+from radial_tokenizer.radial_tokenizer import RadialTokenizer
+from radial_tokenizer.radial_positional_encoding import RadialPositionEmbedding
+
 
 class ModifiedMobileViT(nn.Module):
     """
-    Simplified MobileViT variant for radial token input.
-
-    Inputs:
-        - tokens: [B, 4, 9] tensor of radial ring feature vectors
-        - pos_enc: [B, 4, 192] sinusoidal positional encodings
-
-    Architecture:
-        1. Project 9D tokens to 192D
-        2. Add radial positional encoding
-        3. Pass through Transformer block
-        4. Global average pooling
-        5. MLP classifier head with sigmoid activation
+    MobileViT block with radial tokenizer and transformer integration.
+    Stages follow the theoretical architecture for local + global fusion.
     """
-
-    # sets up the layers and parts of the model
-    def __init__(self, in_dim=9, embed_dim=192, num_classes=1):
+    def __init__(self, in_channels=32, embed_dim=192, num_heads=2):
         super().__init__()
 
-        # Step 1: Project 9D input to 192D embedding (per token)
-        self.proj = nn.Linear(in_dim, embed_dim)            # [B, 4, 9] → [B, 4, 192]
-
-        # Step 2: Transformer block ( step 3 multi-head self-attention + step 4 feed forward) calls transformer_block.py
-        self.transformer = TransformerBlock(embed_dim)      # Self-attention block
-
-        # Step 5: Classifier head (MLP)
-        self.classifier = nn.Sequential(
-            nn.Linear(embed_dim, 64),   # Compress to smaller rep
-            nn.ReLU(),                  # Non-linear activation
-            nn.Linear(64, num_classes)  # Final output: [B, 1] if binary classification
+        self.local_conv = nn.Sequential(                            # Step 1
+            nn.Conv2d(in_channels, in_channels, 3, padding=1, bias=False),
+            nn.BatchNorm2d(in_channels),
+            nn.SiLU()
         )
 
-        # Sigmoid activation to convert logits → probabilities (0 to 1)
-        self.sigmoid = nn.Sigmoid()                         # separate for flexibility (e.g., during training)
+        self.proj_in = nn.Conv2d(in_channels, embed_dim, kernel_size=1)  # Step 2
+        self.token_proj = nn.Linear(9, embed_dim)  # Project 9D tokens to embedding dim
+        
 
-    # describes how input flows through the model
-    def forward(self, tokens, pos_enc, return_logits=False):
-        """
-        Args:
-            tokens: [B, 4, 9]
-            pos_enc: [B, 4, 192]
-            return_logits: If True, returns raw output before sigmoid
+        self.tokenizer = RadialTokenizer()                         # Step 3
+        self.pos_encoder = RadialPositionEmbedding()              # Step 4
 
-        Returns:
-            [B, 1] sigmoid probability by default, or logits if specified
-        """
 
-        # Sanity checks to make sure inputs are aligned
-        assert tokens.shape[0] == pos_enc.shape[0], "Batch sizes must match"
-        assert tokens.shape[1] == pos_enc.shape[1], "Token counts must match"
+        self.transformer = TransformerBlock(embed_dim, num_heads) # Step 5
 
-        # Step 1: Project from 9D to 192D
-        x = self.proj(tokens)           # [B, 4, 192]
+        self.proj_out = nn.Conv2d(embed_dim, in_channels, kernel_size=1)  # Step 7
 
-        #  Step 2: Add positional information
-        x = x + pos_enc                 # add positional encoding
+        self.fuse = nn.Sequential(                                 # Step 9
+            nn.Conv2d(in_channels, in_channels, 3, padding=1, bias=False),
+            nn.BatchNorm2d(in_channels),
+            nn.SiLU()
+        )
 
-        #  Step 3: Run through transformer (self-attention)
-        x = self.transformer(x)         # attention block
+    def forward(self, x, tokens=None, pos_enc=None):
+        res = x  # Save input for skip connection
 
-        #  Step 4: Global average pooling across the 4 tokens
-        x = x.mean(dim=1)               # global average over radial tokens
+        x = self.local_conv(x)              # Step 1
+        x = self.proj_in(x)                 # Step 2 → [B, D, H, W]
 
-        #  Step 5: Classify using MLP
-        logits = self.classifier(x)     # output scalar per sample
+        # ---------------- Radial Tokenizer Expectation ----------------
+        # RadialTokenizer(x) must return:
+        #   - tokens: Tensor of shape [B, P, D], where:
+        #       B = batch size, P = number of radial tokens, D = embed_dim
+        #   - meta: dictionary with the following expected keys:
+        #       'ring_count': int        → number of radial rings
+        #       'angle_count': int       → (optional) number of angular segments
+        #       'original_shape': (H, W) → original spatial size for folding
+        #       'index_map': Tensor      → (optional) mapping grid to radial token index
+        #
+        # These will be used in:
+        #   - RadialPositionEmbedding(meta, device)
+        #   - tokenizer.fold(tokens, meta, output_size)
+        # ---------------------------------------------------------------
 
-        # return logits or sigmoid output
-        return logits if return_logits else self.sigmoid(logits)
+        if tokens is None:
+            tokens, meta = self.tokenizer(x)    # Step 3 → [B, P, D]
+        # If tokens are provided, use them directly with dummy meta
+        else:
+            # Project tokens from 9D to embedding dimension
+            tokens = self.token_proj(tokens)  # [B, 4, 9] → [B, 4, 192]
+            meta = {
+                'ring_count': tokens.shape[1],
+                'original_shape': x.shape[2:]
+            }
+        
+        if pos_enc is None:
+            pe = self.pos_encoder(meta, x.device)  # Step 4
+        else:
+            pe = pos_enc
+        
+        # Now tokens and pe should both be [B, 4, 192]
+        tokens = tokens + pe                # Step 4
+
+        tokens = self.transformer(tokens)   # Step 5
+
+        x = self.tokenizer.fold(tokens, meta, x.shape[2:])  # Step 6 → [B, D, H, W]
+        x = self.proj_out(x)                # Step 7 → back to [B, C, H, W]
+
+        x = x + res                         # Step 8: Residual
+        x = self.fuse(x)                    # Step 9
+        return x                            # Step 10

@@ -1,16 +1,12 @@
-"""
-====================================================================
-NOTE:
-This file is part of the initial A-Eye prototype. Implementations
-are subject to refinement and may be updated for optimization,
-modularity, or alignment with project objectives.
-====================================================================
-"""
-
 import torch
 import torch.nn as nn
 
 class TransformerBlock(nn.Module):
+    """
+    Basic Transformer Encoder block:
+    - Multihead Self-Attention
+    - FeedForward with residuals
+    """
     def __init__(self, dim, heads=4, ff_dim=384, dropout=0.1):
         super().__init__()
         self.attn = nn.MultiheadAttention(embed_dim=dim, num_heads=heads, batch_first=True)
