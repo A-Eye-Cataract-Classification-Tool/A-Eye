@@ -57,10 +57,10 @@ class AEyeModel(nn.Module):
     def forward(self, x_img, tokens=None, pos_enc=None):
         x = self.stage1(x_img)
         x = self.stage2(x)
-        x = self.stage3(x, tokens, pos_enc)  # Pass tokens and pos_enc to ModifiedMobileViT
+        x = self.stage3(x, tokens=None, pos_enc=None)  # Pass tokens and pos_enc to ModifiedMobileViT
         x = self.stage4(x)
-        x = self.stage5(x, tokens, pos_enc)
+        x = self.stage5(x, tokens=None, pos_enc=None)
         x = self.stage6(x)
-        x = self.stage7(x, tokens, pos_enc)
+        x = self.stage7(x, tokens=None, pos_enc=None)
         x = self.pool(x).flatten(1)
         return torch.sigmoid(self.fc(x))
