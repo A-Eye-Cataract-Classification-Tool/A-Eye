@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from modified_mobilevit import ModifiedMobileViT
 
-
+# CONV 3X3
 def conv_3x3_bn(inp, oup, stride=1):
     """3x3 convolution + BatchNorm + SiLU activation"""
     return nn.Sequential(
@@ -11,7 +11,7 @@ def conv_3x3_bn(inp, oup, stride=1):
         nn.SiLU()
     )
 
-
+# MobileNetV2 
 class MV2Block(nn.Module):
     """MobileNetV2 inverted residual block"""
     def __init__(self, inp, oup, stride=1, expansion=4):
@@ -55,12 +55,38 @@ class AEyeModel(nn.Module):
         self.fc = nn.Linear(96, 1)                                             # Stage 9: Binary maturity score
 
     def forward(self, x_img, tokens=None, pos_enc=None):
+        print("\nInput image shape:", x_img.shape)
+        if tokens is not None:
+            print("\nRadial tokens shape:", tokens.shape)
+        if pos_enc is not None:
+            print("\nRadial positional encoding shape:", pos_enc.shape)
+
+        print("\n=================STAGES==================")
         x = self.stage1(x_img)
+        print("\nAfter stage1:", x.shape)
         x = self.stage2(x)
-        x = self.stage3(x, tokens=None, pos_enc=None)  # Pass tokens and pos_enc to ModifiedMobileViT
+        print("\nAfter stage2:", x.shape)
+        
+        x = self.stage3(x, tokens=tokens, pos_enc=pos_enc)  # Only pass once
+        print("\nAfter stage3:", x.shape)
+
         x = self.stage4(x)
-        x = self.stage5(x, tokens=None, pos_enc=None)
+        print("\nAfter stage4:", x.shape)
+        
+        # These don't use tokens/pos_enc for now
+        x = self.stage5(x)
+        print("\nAfter stage5:", x.shape)
+
         x = self.stage6(x)
-        x = self.stage7(x, tokens=None, pos_enc=None)
+        print("\nAfter stage6:", x.shape)
+
+        x = self.stage7(x)
+        print("\nAfter stage7:", x.shape)
+
         x = self.pool(x).flatten(1)
-        return torch.sigmoid(self.fc(x))
+        print("\nAfter global pooling:", x.shape)
+
+        out = torch.sigmoid(self.fc(x))
+        print("\nFinal output shape:", out.shape)
+
+        return out
