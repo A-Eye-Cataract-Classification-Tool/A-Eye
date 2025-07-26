@@ -71,18 +71,23 @@ class ModifiedMobileViT(nn.Module):
 
         # Step 1: Project from 9D to 192D
         x = self.proj(tokens)           # [B, 4, 192]
+        print("🔹 After projection:", x.shape)
 
         #  Step 2: Add positional information
         x = x + pos_enc                 # add positional encoding
+        print("🔹 After adding pos_enc:", x.shape)
 
         #  Step 3: Run through transformer (self-attention)
         x = self.transformer(x)         # attention block
+        print("🔹 After transformer:", x.shape)
 
         #  Step 4: Global average pooling across the 4 tokens
         x = x.mean(dim=1)               # global average over radial tokens
+        print("🔹 After global average pooling:", x.shape)
 
         #  Step 5: Classify using MLP
         logits = self.classifier(x)     # output scalar per sample
+        print("🔹 Before sigmoid (logits):", logits.shape)
 
         # return logits or sigmoid output
         return logits if return_logits else self.sigmoid(logits)

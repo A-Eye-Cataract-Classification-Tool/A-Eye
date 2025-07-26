@@ -54,7 +54,7 @@ if __name__ == "__main__":
     print("Testing RadialPositionEmbedding module...\n")
 
     # FOR DEBUGGING
-    batch_size = 5              # Batch size for testing
+    batch_size = 1              # Batch size for testing
     num_rings = 4               # Number of concentric rings
     embed_dim = 192             # Dimensionality of each token vector
 
