@@ -76,6 +76,7 @@ class ModifiedMobileViT(nn.Module):
         x = self.proj_in(x)     # [B, d, H, W]
 
         # Step 3: Radial tokenization
+        # to be checcked
         if tokens is None:
             tokens, meta = self.tokenizer(x)  # [B, P, d], meta includes ring count & shape
         else:
@@ -86,6 +87,7 @@ class ModifiedMobileViT(nn.Module):
             }
 
         # Step 4: Positional encoding
+        # to be checcked
         if pos_enc is None:
             pe = self.pos_encoder(meta, device=x.device, batch_size=x.size(0))  # [B, P, d]
         else:
