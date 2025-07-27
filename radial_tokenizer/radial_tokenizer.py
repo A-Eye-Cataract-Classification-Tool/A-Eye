@@ -122,6 +122,9 @@ def radial_tokenize(
     logging.info(f" - Projection weights: {os.path.join(path_proj, output_name + '.pt')}")
     if save_9d:
         logging.info(f" - (Optional) 9D token: {os.path.join(path_9d, output_name + '.pt')}")
+        
+    # ========= return the tensors =========
+    return tokens_192d, tokens_9d_tensor
 
 # ========= Run Example =========
 
