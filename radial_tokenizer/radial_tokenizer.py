@@ -1,9 +1,8 @@
 """
 ====================================================================
 NOTE:
-This file is part of the initial A-Eye prototype. Implementations
-are subject to refinement and may be updated for optimization,
-modularity, or alignment with project objectives.
+This file is part of the A-Eye prototype. This version is optimized
+for training by saving only essential outputs, organized by type.
 ====================================================================
 """
 
@@ -47,13 +46,7 @@ def extract_ring_features(image, mask):
     mean = pixels.mean(axis=0)
     std = pixels.std(axis=0)
     median = np.median(pixels, axis=0)
-    return np.concatenate([mean, std, median])
-
-def draw_ring_overlay(image, center, rings, colors):
-    overlay = image.copy()
-    for i, (_, r_out) in enumerate(rings):
-        cv2.circle(overlay, center, r_out, colors[i], thickness=2)
-    return overlay
+    return np.concatenate([mean, std, median])  # shape: (9,)
 
 # ========= Projector Class =========
 
@@ -67,15 +60,25 @@ class RadialProjector(nn.Module):
 
 # ========= Main Function =========
 
-def radial_tokenize(image_path, mask_path=None, output_prefix="output/radial_tokens", projector=None, device="cpu"):
+def radial_tokenize(
+    image_path,
+    mask_path=None,
+    output_base="output",
+    output_name="sample1",
+    projector=None,
+    device="cpu",
+    save_9d=False
+):
     logging.info(f"🖼️  Processing: {image_path}")
 
+    # Load and preprocess image
     image = cv2.imread(image_path)
     if image is None:
         raise FileNotFoundError(f"Image not found at {image_path}")
     image = cv2.resize(image, (128, 128))
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
+    # Use pupil center from mask or fallback
     if mask_path and os.path.exists(mask_path):
         mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
         mask = cv2.resize(mask, (128, 128))
@@ -83,14 +86,12 @@ def radial_tokenize(image_path, mask_path=None, output_prefix="output/radial_tok
     else:
         center = (64, 64)
 
+    # Extract radial ring features
     rings = [(0, 20), (20, 40), (40, 60), (60, 80)]
-    colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0)]
-
     features = [extract_ring_features(image_rgb, create_ring_mask(image.shape, center, r0, r1)) for (r0, r1) in rings]
-    tokens_9d = np.stack(features, axis=0)        # [4, 9]
-    tokens_9d = np.expand_dims(tokens_9d, 0)      # [1, 4, 9]
+    tokens_9d = np.expand_dims(np.stack(features, axis=0), 0)  # [1, 4, 9]
 
-    # Prepare projector
+    # Project to 192D
     if projector is None:
         projector = RadialProjector()
     projector = projector.to(device)
@@ -99,31 +100,36 @@ def radial_tokenize(image_path, mask_path=None, output_prefix="output/radial_tok
     tokens_9d_tensor = torch.tensor(tokens_9d, dtype=torch.float32).to(device)
     tokens_192d = projector(tokens_9d_tensor)
 
-    # Save outputs
-    os.makedirs(os.path.dirname(output_prefix), exist_ok=True)
-    torch.save(tokens_9d_tensor.cpu(), f"{output_prefix}_9D.pt")
-    torch.save(tokens_192d.detach().cpu(), f"{output_prefix}_192D.pt")
-    torch.save(projector.state_dict(), f"{output_prefix}_projection_weights.pt")
+    # ========= Save Outputs by Type =========
+    os.makedirs(output_base, exist_ok=True)
+    path_192d = os.path.join(output_base, "tokens_192D")
+    path_proj = os.path.join(output_base, "projection_weights")
+    path_9d   = os.path.join(output_base, "tokens_9D") if save_9d else None
 
-    torch.save({
-        "features_9D": tokens_9d_tensor.cpu(),
-        "features_192D": tokens_192d.detach().cpu(),
-        "center": center,
-        "image_path": image_path
-    }, f"{output_prefix}_metadata.pt")
+    os.makedirs(path_192d, exist_ok=True)
+    os.makedirs(path_proj, exist_ok=True)
+    if save_9d:
+        os.makedirs(path_9d, exist_ok=True)
 
-    overlay = draw_ring_overlay(image_rgb, center, rings, colors)
-    overlay_bgr = cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR)
-    cv2.imwrite(f"{output_prefix}_visual.png", overlay_bgr)
+    torch.save(tokens_192d.detach().cpu(), os.path.join(path_192d, f"{output_name}.pt"))
+    torch.save(projector.state_dict(), os.path.join(path_proj, f"{output_name}.pt"))
+    if save_9d:
+        torch.save(tokens_9d_tensor.cpu(), os.path.join(path_9d, f"{output_name}.pt"))
 
-    logging.info(f"✅ Saved: {output_prefix}_9D.pt, {output_prefix}_192D.pt, {output_prefix}_visual.png")
-    logging.info(f"📦 Metadata and projection weights saved for training reproducibility.")
+    # ========= Logs =========
+    logging.info("✅ Saved:")
+    logging.info(f" - 192D token: {os.path.join(path_192d, output_name + '.pt')}")
+    logging.info(f" - Projection weights: {os.path.join(path_proj, output_name + '.pt')}")
+    if save_9d:
+        logging.info(f" - (Optional) 9D token: {os.path.join(path_9d, output_name + '.pt')}")
 
 # ========= Run Example =========
 
 if __name__ == "__main__":
     radial_tokenize(
-        image_path="C:/Users/denni/Downloads/test.png",            # Change this path
+        image_path="C:/Users/denni/Downloads/test.png",     # update path
         mask_path=None,
-        output_prefix="output/radial_tokens"
+        output_base="output",
+        output_name="sample1",
+        save_9d=False                                       # change to True to create 9D
     )
