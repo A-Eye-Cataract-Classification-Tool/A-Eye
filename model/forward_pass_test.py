@@ -8,7 +8,7 @@ import numpy as np
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from model.aeye_model import AEyeModel
-from radial_tokenizer.radial_tokenizer import radial_tokenize
+from radial_tokenizer.radial_tokenizer import radial_tokenizer
 
 # --- Helper to create a dummy image for testing ---
 def create_dummy_image(path="dummy_test_image.png"):
@@ -26,7 +26,7 @@ dummy_image_path = create_dummy_image()
 
 # Correctly unpack the tuple returned by the function
 # We get both the projected 192D and original 9D tokens
-_, tokens_9d = radial_tokenize(
+_, tokens_9d = radial_tokenizer(
     image_path=dummy_image_path,
     output_name="sample1" # Added to match original function signature
 )
