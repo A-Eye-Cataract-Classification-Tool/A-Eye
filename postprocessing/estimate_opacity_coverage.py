@@ -1,11 +1,30 @@
-import numpy as np
+import torch
 
-def estimate_opacity_percent(tokens):  # tokens: [4, 9]
-    mean_rgb = tokens[:, :3].mean(axis=1)  # mean per ring
-    brightness = mean_rgb.mean()
-    return round((brightness / 255) * 100, 2)
+def estimate_opacity_coverage(tokens_192d: torch.Tensor, threshold: float = 0.5):
+    """
+    Estimate opacity and coverage based on token brightness.
 
-def estimate_coverage_percent(tokens, threshold=180):
-    mean_rgb = tokens[:, :3].mean(axis=1)
-    is_opaque = (mean_rgb > threshold).astype(int)
-    return int((is_opaque.sum() / 4) * 100)
+    Args:
+        tokens_192d (Tensor): shape [B, 4, 192]
+        threshold (float): threshold for coverage decision
+
+    Returns:
+        List[Dict]: One dict per batch item, each with:
+        {
+            "opacity_percent": float,
+            "coverage_percent": float
+        }
+    """
+    results = []
+
+    opacity = tokens_192d.mean(dim=(1, 2)) * 100  # [B]
+    ring_mean = tokens_192d.mean(dim=2)           # [B, 4]
+    coverage = (ring_mean > threshold).sum(dim=1) / 4.0 * 100  # [B]
+
+    for o, c in zip(opacity, coverage):
+        results.append({
+            "opacity_percent": round(o.item(), 2),
+            "coverage_percent": round(c.item(), 2)
+        })
+
+    return results
