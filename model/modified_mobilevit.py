@@ -33,9 +33,6 @@ class ModifiedMobileViT(nn.Module):
         )
         self.proj_in = nn.Conv2d(in_channels, embed_dim, kernel_size=1)
 
-        # == ADDED == Internal projection layer to handle 9D -> 192D
-        self.token_proj = nn.Linear(9, embed_dim)
-
         # Learnable positional encoding for the radial tokens
         self.pos_encoder = RadialPositionEmbedding(num_rings=4, embed_dim=embed_dim)
 
@@ -63,11 +60,8 @@ class ModifiedMobileViT(nn.Module):
         x_local = self.local_conv(x)
         x_proj = self.proj_in(x_local)
 
-        # Project 9D tokens to the 192D embedding dimension
-        tokens_proj = self.token_proj(tokens)
-
-        # Apply positional encoding
-        tokens_encoded = self.pos_encoder(tokens_proj)
+        # Apply positional encoding directly to the 192D tokens
+        tokens_encoded = self.pos_encoder(tokens)
 
         # Apply transformer for global reasoning
         tokens_transformed = self.transformer(tokens_encoded)

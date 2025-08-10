@@ -40,8 +40,13 @@ def extract_ring_features(image, mask):
 class RadialProjector(nn.Module):
     def __init__(self, in_dim=9, out_dim=192):
         super().__init__()
-        self.proj = nn.Linear(in_dim, out_dim)
-
+        # change dthis from self.proj = nn.Linear(in_dim, out_dim) to this
+        # to ensure all output values are >= 0
+        self.proj = nn.Sequential(
+            nn.Linear(in_dim, out_dim),
+            nn.ReLU() # This ensures all output values are >= 0
+        )
+        
     def forward(self, x):
         return self.proj(x)
 

@@ -1,82 +1,52 @@
-import sys
-import os
+# In A-Eye/model/forward_pass_test.py
+
 import torch
+import json
+import os
 import cv2
 import numpy as np
-import json
+import sys
 
-# Add parent directory to path for sibling imports
+# Add parent directory to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from model.aeye_model import AEyeModel
-from radial_tokenizer.radial_tokenizer import RadialTokenizer
-
-# --- Helper to create a dummy image for testing ---
-def create_dummy_image(path="dummy_test_image.png"):
-    if not os.path.exists(path):
-        img = np.zeros((128, 128, 3), dtype=np.uint8)
-        cv2.circle(img, (64, 64), 30, (150, 150, 150), -1)
-        cv2.imwrite(path, img)
-    return path
 
 # --- Main Test Workflow ---
+print("🚀 Starting FULL model pipeline test...")
 
-# Step 1: Run the radial tokenizer
-print("Step 1: Running the radial tokenizer...")
-dummy_image_path = create_dummy_image()
-img = cv2.imread(dummy_image_path)
-img_tensor = torch.from_numpy(img).permute(2, 0, 1).unsqueeze(0).float() / 255.0
-
-# Initialize Tokenizer and get tokens
-tokenizer = RadialTokenizer()
-tokens_192d = tokenizer(img_tensor)
-
-
-# Step 2: Initialize the full AEyeModel
-print("\nStep 2: Initializing the AEyeModel...")
+# 1. Initialize the complete, self-contained AEyeModel
 model = AEyeModel()
-model.eval()  # Set model to evaluation mode
-print(" Model initialized.")
+model.eval()
+print("✅ AEyeModel initialized.")
 
-# Step 3: Run the forward pass with the 192D tokens
-print("\nStep 3: Running the model's forward pass...")
-print(f"Input image shape: {img_tensor.shape}")
+# 2. Create a dummy image and prepare the tensor
+img = np.zeros((128, 128, 3), dtype=np.uint8)
+cv2.circle(img, (64, 64), 40, (150, 150, 150), -1) 
+img_tensor = torch.from_numpy(img).permute(2, 0, 1).unsqueeze(0).float() / 255.0
+print(f"✅ Prepared dummy image tensor of shape: {img_tensor.shape}")
+
+# 3. Run the full forward pass with a single call
 with torch.no_grad():
-    # Pass the image and tokens to the model
-    # Note: The AEyeModel forward pass needs to be adjusted to accept tokens
-    # and pass them to the ModifiedMobileViT stages.
-    # The following is a conceptual adjustment to AEyeModel's forward method.
-    
-    # In aeye_model.py, the forward pass should look like this:
-    # def forward(self, x_img, tokens):
-    #     x = self.stage1(x_img)
-    #     x = self.stage2(x)
-    #     x = self.stage3(x, tokens=tokens)
-    #     ... and so on for other stages.
-    #     The final output of the model would then be the result from the last ModifiedMobileViT stage.
-    
-    # For now, let's assume we are just testing the ModifiedMobileViT block
-    modified_vit = model.stage3 # Or any other ModifiedMobileViT stage
-    result = modified_vit(torch.randn(1, 32, 32, 32), tokens_192d)
+    final_output = model(img_tensor) # This one line runs the whole pipeline!
 
-print(" Forward pass complete.")
+print("\n--- ✅ Forward Pass Complete ---")
+print("Final JSON Output:")
+print(json.dumps(final_output, indent=4))
 
-# Step 4: Display and Save the results
-print("\n--- Results ---")
-print("Final output:", result)
+# 4. Save the deliverables
+output_dir = "output"
+os.makedirs(os.path.join(output_dir, "coverage_results"), exist_ok=True)
 
-# Save JSON Output
-output_dir = "output/coverage_results"
-os.makedirs(output_dir, exist_ok=True)
-with open(os.path.join(output_dir, "sample1.json"), "w") as f:
-    json.dump(result, f, indent=2)
-print(f" Saved JSON output to: {os.path.join(output_dir, 'sample1.json')}")
+# Save JSON output
+json_path = os.path.join(output_dir, "coverage_results", "example_output.json")
+with open(json_path, "w") as f:
+    json.dump(final_output, f, indent=4)
+print(f"\n💾 Saved example JSON to: {json_path}")
 
+# Save the trained model weights
+model_path = os.path.join(output_dir, "model_final.pt")
+torch.save(model.state_dict(), model_path)
+print(f"💾 Saved model weights to: {model_path}")
 
-# Export Model for Training
-output_dir_model = "output"
-os.makedirs(output_dir_model, exist_ok=True)
-torch.save(model.state_dict(), os.path.join(output_dir_model, "model_final.pt"))
-print(f" Saved model weights to: {os.path.join(output_dir_model, 'model_final.pt')}")
-
-print("\nIntegration successful!")
+print("\n🎉 Integration successful! Model is ready for training.")

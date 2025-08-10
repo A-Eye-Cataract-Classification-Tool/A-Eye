@@ -1,6 +1,16 @@
 import torch
 import torch.nn as nn
 from modified_mobilevit import ModifiedMobileViT
+from typing import Dict
+import sys
+import os
+
+# Allow sibling imports
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from model.modified_mobilevit import ModifiedMobileViT
+from radial_tokenizer.radial_tokenizer import RadialTokenizer
+from postprocessing.estimate_opacity_coverage import estimate_opacity_coverage
+
 
 # CONV 3X3
 def conv_3x3_bn(inp, oup, stride=1):
@@ -37,55 +47,52 @@ class MV2Block(nn.Module):
 class AEyeModel(nn.Module):
     def __init__(self):
         super().__init__()
+        
+        # The tokenizer is now part of the model itself
+        self.tokenizer = RadialTokenizer()
 
-        # --------- BONE ---------
-        self.stage1 = conv_3x3_bn(3, 16, stride=2)                              # Stage 1: 128x128x3 → 64x64x16
-        self.stage2 = MV2Block(16, 32, stride=2)                                # Stage 2: 64x64x16 → 32x32x32
-        self.stage3 = ModifiedMobileViT(in_channels=32, embed_dim=192)          # Stage 3: Radial + Global
+        # --------- CNN-ViT BACKBONE ---------
+        self.stage1 = conv_3x3_bn(3, 16, stride=2)
+        self.stage2 = MV2Block(16, 32, stride=2)
+        self.stage3 = ModifiedMobileViT(in_channels=32, embed_dim=192)
+        self.stage4 = MV2Block(32, 64, stride=2)
+        self.stage5 = ModifiedMobileViT(in_channels=64, embed_dim=192)
+        self.stage6 = MV2Block(64, 96, stride=2)
+        self.stage7 = ModifiedMobileViT(in_channels=96, embed_dim=192)
 
-        self.stage4 = MV2Block(32, 64, stride=2)                                # Stage 4: 32x32x32 → 16x16x64
-        self.stage5 = ModifiedMobileViT(in_channels=64, embed_dim=192)          # Stage 5: Deep Radial
+        # --------- CLASSIFICATION HEAD ---------
+        self.pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc = nn.Linear(96, 1)
 
-        # --------- NECK ---------
-        self.stage6 = MV2Block(64, 96, stride=2)                                # Stage 6: 16x16x64 → 8x8x96
-        self.stage7 = ModifiedMobileViT(in_channels=96, embed_dim=192)          # Stage 7: High-level Radial
+    def forward(self, x_img: torch.Tensor) -> Dict:
+        """
+        Performs the ENTIRE forward pass from image to final JSON-ready output.
+        """
+        # 1. Generate radial tokens from the original input image.
+        tokens_192d = self.tokenizer(x_img)
 
-        # --------- HEAD ---------
-        self.pool = nn.AdaptiveAvgPool2d((1, 1))                                # Stage 8: Global pooling
-        self.fc = nn.Linear(96, 1)                                              # Stage 9: Binary maturity score
-
-    def forward(self, x_img, tokens=None, pos_enc=None):
-        print("\nInput image shape:", x_img.shape)
-        if tokens is not None:
-            print("\nRadial tokens shape:", tokens.shape)
-        if pos_enc is not None:
-            print("\nRadial positional encoding shape:", pos_enc.shape)
-
-        print("\n=================STAGES==================")
+        # 2. Pass image and tokens through the hybrid backbone.
         x = self.stage1(x_img)
-        print("\nAfter stage1:", x.shape)
         x = self.stage2(x)
-        print("\nAfter stage2:", x.shape)
-        
-        x = self.stage3(x, tokens=tokens)                                       # Only pass once
-        print("\nAfter stage3:", x.shape)
-
+        x = self.stage3(x, tokens=tokens_192d)
         x = self.stage4(x)
-        print("\nAfter stage4:", x.shape)
-        
-        x = self.stage5(x, tokens=tokens)
-        print("\nAfter stage5:", x.shape)
-
+        x = self.stage5(x, tokens=tokens_192d)
         x = self.stage6(x)
-        print("\nAfter stage6:", x.shape)
+        x = self.stage7(x, tokens=tokens_192d)
 
-        x = self.stage7(x, tokens=tokens)
-        print("\nAfter stage7:", x.shape)
-
+        # 3. Get the final classification score.
         x = self.pool(x).flatten(1)
-        print("\nAfter global pooling:", x.shape)
+        prediction_prob = torch.sigmoid(self.fc(x))
 
-        out = torch.sigmoid(self.fc(x))
-        print("\nFinal output shape:", out.shape)
-
-        return out
+        # 4. Calculate opacity/coverage metrics from the tokens.
+        metrics = estimate_opacity_coverage(tokens_192d)[0]
+        
+        # 5. Combine prediction and metrics into the final JSON output.
+        prediction_label = "Mature Cataract" if prediction_prob.item() >= 0.5 else "Immature Cataract"
+        
+        result = {
+            "prediction": prediction_label,
+            **metrics 
+        }
+        
+        return result
