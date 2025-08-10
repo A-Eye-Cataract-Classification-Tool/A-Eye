@@ -67,7 +67,7 @@ class AEyeModel(nn.Module):
         x = self.stage2(x)
         print("\nAfter stage2:", x.shape)
         
-        x = self.stage3(x, tokens=tokens)  # Only pass once
+        x = self.stage3(x, tokens=tokens) 
         print("\nAfter stage3:", x.shape)
 
         x = self.stage4(x)
