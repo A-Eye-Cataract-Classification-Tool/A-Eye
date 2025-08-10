@@ -36,20 +36,11 @@ def extract_ring_features(image, mask):
     median = np.median(pixels, axis=0)
     return np.concatenate([mean, std, median])
 
-# ========= Radial Projector =========
-class RadialProjector(nn.Module):
-    def __init__(self, in_dim=9, out_dim=192):
-        super().__init__()
-        self.proj = nn.Linear(in_dim, out_dim)
-
-    def forward(self, x):
-        return self.proj(x)
-
-# ========= Radial Tokenizer Module =========
+# ========= Radial Tokenizer Module (Corrected) =========
 class RadialTokenizer(nn.Module):
     def __init__(self):
         super().__init__()
-        self.projector = RadialProjector()
+        # The internal projector has been REMOVED.
         self.center = (64, 64)
         self.rings = [(0, 16), (16, 32), (32, 48), (48, 64)]
 
@@ -71,6 +62,6 @@ class RadialTokenizer(nn.Module):
             tokens_9d_list.append(ring_features)
 
         tokens_9d = torch.tensor(tokens_9d_list, dtype=torch.float32, device=device)
-        tokens_192d = self.projector(tokens_9d)
 
-        return tokens_192d
+        # Return the raw 9D tokens directly. The projection step is gone.
+        return tokens_9d
