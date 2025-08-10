@@ -39,20 +39,20 @@ class AEyeModel(nn.Module):
         super().__init__()
 
         # --------- BONE ---------
-        self.stage1 = conv_3x3_bn(3, 16, stride=2)                             # Stage 1: 128x128x3 → 64x64x16
-        self.stage2 = MV2Block(16, 32, stride=2)                               # Stage 2: 64x64x16 → 32x32x32
-        self.stage3 = ModifiedMobileViT(in_channels=32, embed_dim=192)        # Stage 3: Radial + Global
+        self.stage1 = conv_3x3_bn(3, 16, stride=2)                              # Stage 1: 128x128x3 → 64x64x16
+        self.stage2 = MV2Block(16, 32, stride=2)                                # Stage 2: 64x64x16 → 32x32x32
+        self.stage3 = ModifiedMobileViT(in_channels=32, embed_dim=192)          # Stage 3: Radial + Global
 
-        self.stage4 = MV2Block(32, 64, stride=2)                               # Stage 4: 32x32x32 → 16x16x64
-        self.stage5 = ModifiedMobileViT(in_channels=64, embed_dim=192)        # Stage 5: Deep Radial
+        self.stage4 = MV2Block(32, 64, stride=2)                                # Stage 4: 32x32x32 → 16x16x64
+        self.stage5 = ModifiedMobileViT(in_channels=64, embed_dim=192)          # Stage 5: Deep Radial
 
         # --------- NECK ---------
-        self.stage6 = MV2Block(64, 96, stride=2)                               # Stage 6: 16x16x64 → 8x8x96
-        self.stage7 = ModifiedMobileViT(in_channels=96, embed_dim=192)        # Stage 7: High-level Radial
+        self.stage6 = MV2Block(64, 96, stride=2)                                # Stage 6: 16x16x64 → 8x8x96
+        self.stage7 = ModifiedMobileViT(in_channels=96, embed_dim=192)          # Stage 7: High-level Radial
 
         # --------- HEAD ---------
-        self.pool = nn.AdaptiveAvgPool2d((1, 1))                               # Stage 8: Global pooling
-        self.fc = nn.Linear(96, 1)                                             # Stage 9: Binary maturity score
+        self.pool = nn.AdaptiveAvgPool2d((1, 1))                                # Stage 8: Global pooling
+        self.fc = nn.Linear(96, 1)                                              # Stage 9: Binary maturity score
 
     def forward(self, x_img, tokens=None, pos_enc=None):
         print("\nInput image shape:", x_img.shape)
@@ -67,7 +67,11 @@ class AEyeModel(nn.Module):
         x = self.stage2(x)
         print("\nAfter stage2:", x.shape)
         
+<<<<<<< HEAD
         x = self.stage3(x, tokens=tokens) 
+=======
+        x = self.stage3(x, tokens=tokens)                                       # Only pass once
+>>>>>>> 66709611c64def3404281127c624541bff674f41
         print("\nAfter stage3:", x.shape)
 
         x = self.stage4(x)
