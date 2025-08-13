@@ -12,7 +12,8 @@ from radial_tokenizer.radial_tokenizer import RadialTokenizer
 from postprocessing.estimate_opacity_coverage import estimate_opacity_coverage
 
 
-# CONV 3X3
+# CONV 3X3 
+# helper
 def conv_3x3_bn(inp, oup, stride=1):
     """3x3 convolution + BatchNorm + SiLU activation"""
     return nn.Sequential(
@@ -22,6 +23,7 @@ def conv_3x3_bn(inp, oup, stride=1):
     )
 
 # MobileNetV2 
+# helper
 class MV2Block(nn.Module):
     """MobileNetV2 inverted residual block"""
     def __init__(self, inp, oup, stride=1, expansion=4):
@@ -52,7 +54,7 @@ class AEyeModel(nn.Module):
         self.tokenizer = RadialTokenizer()
 
         # --------- CNN-ViT BACKBONE ---------
-        self.stage1 = conv_3x3_bn(3, 16, stride=2)
+        self.stage1 = conv_3x3_bn(3, 16, stride=2) 
         self.stage2 = MV2Block(16, 32, stride=2)
         self.stage3 = ModifiedMobileViT(in_channels=32, embed_dim=192)
         self.stage4 = MV2Block(32, 64, stride=2)

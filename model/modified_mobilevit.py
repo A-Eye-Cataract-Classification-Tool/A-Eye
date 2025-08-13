@@ -9,7 +9,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from model.transformer_block import TransformerBlock
 from radial_tokenizer.radial_positional_encoding import RadialPositionEmbedding
 
-# Placeholder for folding tokens back to a grid.
 def fold_tokens_to_grid(tokens, output_size):
     """Placeholder function to map radial tokens back to a spatial grid."""
     B, P, D = tokens.shape
